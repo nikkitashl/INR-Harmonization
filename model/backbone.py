@@ -67,7 +67,7 @@ class HRNetV2(nn.Module):
 
         if pretained:
             self.load_pretrained_weights(
-                r".\pretrained_models/hrnetv2_w18_imagenet_pretrained.pth")
+                r"./pretrained_models/hrnetv2_w18_imagenet_pretrained.pth")
 
         self.output_resolution = (opt.input_size // 8) ** 2
 

@@ -14,7 +14,16 @@ from torch.utils.data import DataLoader
 
 
 class dataset_generator(torch.utils.data.Dataset):
-    def __init__(self, dataset_txt, alb_transforms, torch_transforms, opt, area_keep_thresh=0.2, mode='Train'):
+    def __init__(
+            self,
+            alb_transforms,
+            torch_transforms,
+            opt,
+            area_keep_thresh=0.2,
+            mode='Train',
+            dataset_txt=None,
+            adapter=None
+    ):
         super().__init__()
 
         self.opt = opt
@@ -25,34 +34,36 @@ class dataset_generator(torch.utils.data.Dataset):
         self.torch_transforms = torch_transforms
         self.kp_t = area_keep_thresh
 
-        with open(dataset_txt, 'r') as f:
-            self.dataset_samples = [os.path.join(self.root_path, x.strip()) for x in f.readlines()]
+        self.adapter = adapter
+        # with open(dataset_txt, 'r') as f:
+        #     self.dataset_samples = [os.path.join(self.root_path, x.strip()) for x in f.readlines()]
 
         self.INR_dataset = Implicit2DGenerator(opt, self.mode)
 
     def __len__(self):
-        return len(self.dataset_samples)
+        return len(self.adapter)
 
     def __getitem__(self, idx):
-        composite_image = self.dataset_samples[idx]
+        composite_image, real_image, mask, item_path = self.adapter[idx]
+        # composite_image = self.dataset_samples[idx]
+        #
+        # if self.opt.hr_train:
+        #     if self.opt.isFullRes:
+        #         "Since in dataset preprocessing, we resize the image in HAdobe5k to a lower resolution for " \
+        #         "quick loading, we need to change the path here to that of the original resolution of HAdobe5k " \
+        #         "if `opt.isFullRes` is set to True."
+        #         composite_image = composite_image.replace("HAdobe5k", "HAdobe5kori")
+        #
+        # real_image = '_'.join(composite_image.split('_')[:2]).replace("composite_images", "real_images") + '.jpg'
+        # mask = '_'.join(composite_image.split('_')[:-1]).replace("composite_images", "masks") + '.png'
 
-        if self.opt.hr_train:
-            if self.opt.isFullRes:
-                "Since in dataset preprocessing, we resize the image in HAdobe5k to a lower resolution for " \
-                "quick loading, we need to change the path here to that of the original resolution of HAdobe5k " \
-                "if `opt.isFullRes` is set to True."
-                composite_image = composite_image.replace("HAdobe5k", "HAdobe5kori")
-
-        real_image = '_'.join(composite_image.split('_')[:2]).replace("composite_images", "real_images") + '.jpg'
-        mask = '_'.join(composite_image.split('_')[:-1]).replace("composite_images", "masks") + '.png'
-
-        composite_image = cv2.imread(composite_image)
+        # composite_image = cv2.imread(composite_image)
         composite_image = cv2.cvtColor(composite_image, cv2.COLOR_BGR2RGB)
 
-        real_image = cv2.imread(real_image)
+        # real_image = cv2.imread(real_image)
         real_image = cv2.cvtColor(real_image, cv2.COLOR_BGR2RGB)
 
-        mask = cv2.imread(mask)
+        # mask = cv2.imread(mask)
         mask = mask[:, :, 0].astype(np.float32) / 255.
 
         """
@@ -228,8 +239,8 @@ class dataset_generator(torch.utils.data.Dataset):
                     self.torch_transforms, transform_out[0], transform_out[1], mask)
 
                 return {
-                    'file_path': self.dataset_samples[idx],
-                    'category': self.dataset_samples[idx].split("\\")[-1].split("/")[0],
+                    'file_path': item_path,
+                    'category': item_path.split("\\")[-1].split("/")[0],
                     'composite_image': out_comp,
                     'real_image': out_real,
                     'mask': out_mask,
@@ -274,8 +285,8 @@ class dataset_generator(torch.utils.data.Dataset):
                         self.torch_transforms, transform_out['image'], transform_out['real_image'], mask)
 
                     return {
-                        'file_path': self.dataset_samples[idx],
-                        'category': self.dataset_samples[idx].split("\\")[-1].split("/")[0],
+                        'file_path': item_path,
+                        'category': item_path.split("\\")[-1].split("/")[0],
                         'composite_image': self.torch_transforms(transform_out['image']),
                         'real_image': self.torch_transforms(transform_out['real_image']),
                         'mask': transform_out['object_mask'][np.newaxis, ...].astype(np.float32),
@@ -298,8 +309,8 @@ class dataset_generator(torch.utils.data.Dataset):
                         self.torch_transforms, composite_image, real_image, mask_tmp)
 
                     return {
-                        'file_path': self.dataset_samples[idx],
-                        'category': self.dataset_samples[idx].split("\\")[-1].split("/")[0],
+                        'file_path': item_path,
+                        'category': item_path.split("\\")[-1].split("/")[0],
                         'composite_image': self.torch_transforms(composite_image),
                         'real_image': self.torch_transforms(real_image),
                         'mask': mask[np.newaxis, ...].astype(np.float32),
@@ -337,8 +348,8 @@ class dataset_generator(torch.utils.data.Dataset):
             self.torch_transforms, transform_out['image'], transform_out['real_image'], mask)
 
         return {
-            'file_path': self.dataset_samples[idx],
-            'category': self.dataset_samples[idx].split("\\")[-1].split("/")[0],
+            'file_path': item_path,
+            'category': item_path.split("\\")[-1].split("/")[0],
             'composite_image': self.torch_transforms(transform_out['image']),
             'real_image': self.torch_transforms(transform_out['real_image']),
             'mask': transform_out['object_mask'][np.newaxis, ...].astype(np.float32),

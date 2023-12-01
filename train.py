@@ -13,6 +13,7 @@ import processing
 from utils import build_loss, misc
 from model.build_model import build_model
 from datasets.build_dataset import dataset_generator
+from datasets.tattoo_adapter import TattooAdapter
 
 
 def parse_args():
@@ -107,11 +108,32 @@ def parse_args():
 
 
 def main_process(opt):
+    corrupt_real_image_augs = albumentations.Compose(
+        [
+            albumentations.ChannelShuffle(),
+            # albumentations.Defocus(),
+            albumentations.ColorJitter(brightness=1, contrast=1, saturation=1, hue=1),
+            albumentations.Downscale(),
+            albumentations.HueSaturationValue(),
+            albumentations.ImageCompression(),
+            albumentations.Posterize(),
+            albumentations.RGBShift(),
+            albumentations.RingingOvershoot()
+        ]
+    )
+
     logger = misc.create_logger(os.path.join(opt.save_path, "log.txt"))
     cudnn.benchmark = True
 
     trainset_path = os.path.join(opt.dataset_path, "IHD_train.txt")
     valset_path = os.path.join(opt.dataset_path, "IHD_test.txt")
+
+    train_adapter = TattooAdapter(opt.dataset_path,
+        trainset_path, "images", "masks", corrupt_real_image_augs
+    )
+    val_adapter = TattooAdapter(opt.dataset_path,
+        valset_path, "images", "masks", corrupt_real_image_augs
+    )
 
     opt.transform_mean = [.5, .5, .5]
     opt.transform_var = [.5, .5, .5]
@@ -128,9 +150,9 @@ def main_process(opt):
     valset_alb_transform = albumentations.Compose([Resize(opt.input_size, opt.input_size)],
                                                   additional_targets={'real_image': 'image', 'object_mask': 'image'})
 
-    trainset = dataset_generator(trainset_path, trainset_alb_transform, torch_transform, opt, mode='Train')
+    trainset = dataset_generator(trainset_alb_transform, torch_transform, opt, mode='Train', adapter=train_adapter)
 
-    valset = dataset_generator(valset_path, valset_alb_transform, torch_transform, opt, mode='Val')
+    valset = dataset_generator(valset_alb_transform, torch_transform, opt, mode='Val', adapter=val_adapter)
 
     train_loader = DataLoader(trainset, opt.batch_size, shuffle=True, drop_last=True,
                               pin_memory=True,

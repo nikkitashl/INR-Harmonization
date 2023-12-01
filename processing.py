@@ -28,9 +28,9 @@ def train(train_loader, val_loader, model, optimizer, scheduler, loss_fn, logger
         model = model.cpu()
         model.load_state_dict(load_state['model'], strict=False)
         model = model.to(opt.device)
-        optimizer.load_state_dict(load_state['optimizer'])
-        scheduler.load_state_dict(load_state['scheduler'])
-        start_epoch = load_state['last_epoch'] + 1
+        # optimizer.load_state_dict(load_state['optimizer'])
+        # scheduler.load_state_dict(load_state['scheduler'])
+        # start_epoch = load_state['last_epoch'] + 1
 
     for epoch in range(start_epoch, opt.epochs):
         model.train()
