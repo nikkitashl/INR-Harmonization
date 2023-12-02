@@ -111,15 +111,16 @@ def main_process(opt):
     corrupt_real_image_augs = albumentations.Compose(
         [
             albumentations.ChannelShuffle(),
-            # albumentations.Defocus(),
-            albumentations.ColorJitter(brightness=1, contrast=1, saturation=1, hue=1),
+            albumentations.ColorJitter(),
             albumentations.Downscale(),
             albumentations.HueSaturationValue(),
             albumentations.ImageCompression(),
             albumentations.Posterize(),
             albumentations.RGBShift(),
-            albumentations.RingingOvershoot()
-        ]
+            albumentations.RingingOvershoot(),
+            albumentations.Sharpen()
+        ],
+        p=0.7
     )
 
     logger = misc.create_logger(os.path.join(opt.save_path, "log.txt"))

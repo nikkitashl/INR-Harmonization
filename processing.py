@@ -24,7 +24,7 @@ def train(train_loader, val_loader, model, optimizer, scheduler, loss_fn, logger
     "Load pretrained checkpoints"
     if opt.pretrained is not None:
         logger.info(f"Load pretrained weight from {opt.pretrained}")
-        load_state = torch.load(opt.pretrained)
+        load_state = torch.load(opt.pretrained, map_location=opt.device)
         model = model.cpu()
         model.load_state_dict(load_state['model'], strict=False)
         model = model.to(opt.device)
@@ -68,9 +68,9 @@ def train(train_loader, val_loader, model, optimizer, scheduler, loss_fn, logger
                 if opt.hr_train:
                     for n in range(3):
                         loss_fg_content_bg_appearance_construct += loss_fn['masked_mse'] \
-                            (fg_content_bg_appearance_construct[n], real_image[3 - n], mask[3 - n])
+                            (fg_content_bg_appearance_construct[n], real_image[3 - n], mask[3 - n], device=opt.device)
                     loss_fg_content_bg_appearance_construct /= 3
-                    loss_lut_transform_image = loss_fn['masked_mse'](lut_transform_image, real_image[1], mask[1])
+                    loss_lut_transform_image = loss_fn['masked_mse'](lut_transform_image, real_image[1], mask[1], device=opt.device)
                 else:
                     for n in range(3):
                         loss_fg_content_bg_appearance_construct += loss_fn['MaskWeightedMSE'] \

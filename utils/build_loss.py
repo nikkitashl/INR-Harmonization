@@ -20,16 +20,16 @@ def mse(pred, gt):
     return torch.mean((pred - gt) ** 2)
 
 
-def masked_mse(pred, gt, mask):
-    delimin = torch.clamp_min(torch.sum(mask, dim=([x for x in range(1, len(mask.shape))])), 100).cuda()
+def masked_mse(pred, gt, mask, device="cuda"):
+    delimin = torch.clamp_min(torch.sum(mask, dim=([x for x in range(1, len(mask.shape))])), 100).to(device)
     # total = torch.sum(torch.ones_like(mask), dim=([x for x in range(1, len(mask.shape))]))
     out = torch.sum((mask > 100 / 255.) * (pred - gt) ** 2, dim=([x for x in range(1, len(mask.shape))]))
     out = out / delimin
     return torch.mean(out)
 
 
-def sample_weighted_mse(pred, gt, mask):
-    multi_factor = torch.clamp_min(torch.sum(mask, dim=([x for x in range(1, len(mask.shape))])), 100).cuda()
+def sample_weighted_mse(pred, gt, mask, device="cuda"):
+    multi_factor = torch.clamp_min(torch.sum(mask, dim=([x for x in range(1, len(mask.shape))])), 100).to(device)
     multi_factor = multi_factor / (multi_factor.sum())
     # total = torch.sum(torch.ones_like(mask), dim=([x for x in range(1, len(mask.shape))]))
     out = torch.mean((pred - gt) ** 2, dim=([x for x in range(1, len(mask.shape))]))
