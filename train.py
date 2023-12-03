@@ -15,6 +15,8 @@ from model.build_model import build_model
 from datasets.build_dataset import dataset_generator
 from datasets.tattoo_adapter import TattooAdapter
 
+from functools import partial
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -92,6 +94,9 @@ def parse_args():
     parser.add_argument('--isFullRes', action="store_true",
                         help='Whether for original resolution. See section 3.4 in the paper.')
 
+    parser.add_argument("--scheduler", type=str, help="What scheduler to use", default="one_cycle")
+    parser.add_argument("--warm_steps", type=int, help="Warmup steps", default=100)
+
     opt = parser.parse_args()
 
     opt.save_path = misc.increment_path(os.path.join(opt.save_path, "exp1"))
@@ -105,6 +110,39 @@ def parse_args():
         opt.wandb = False
 
     return opt
+
+
+def _get_linear_schedule_with_warmup_lr_lambda(current_step: int, *, num_warmup_steps: int, num_training_steps: int):
+    if current_step < num_warmup_steps:
+        return float(current_step) / float(max(1, num_warmup_steps))
+    return max(0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps)))
+
+
+def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
+    """
+    Create a schedule with a learning rate that decreases linearly from the initial lr set in the optimizer to 0, after
+    a warmup period during which it increases linearly from 0 to the initial lr set in the optimizer.
+
+    Args:
+        optimizer ([`~torch.optim.Optimizer`]):
+            The optimizer for which to schedule the learning rate.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        num_training_steps (`int`):
+            The total number of training steps.
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+
+    Return:
+        `torch.optim.lr_scheduler.LambdaLR` with the appropriate schedule.
+    """
+
+    lr_lambda = partial(
+        _get_linear_schedule_with_warmup_lr_lambda,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+    )
+    return lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch)
 
 
 def main_process(opt):
@@ -172,8 +210,12 @@ def main_process(opt):
     }
     optimizer = misc.get_optimizer(model, opt.optim, optimizer_params)
 
-    scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.lr, total_steps=opt.epochs * len(train_loader),
-                                        pct_start=0.0)
+    scheduler = None
+    if opt.scheduler == "one_cycle":
+        scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.lr, total_steps=opt.epochs * len(train_loader),
+                                            pct_start=0.0)
+    elif opt.scheduler == "warmup":
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=opt.warm_steps, num_training_steps=opt.epochs * len(train_loader))
 
     processing.train(train_loader, val_loader, model, optimizer, scheduler, loss_fn, logger, opt)
 
