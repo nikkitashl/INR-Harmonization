@@ -10,10 +10,10 @@ class BasicBlockV1b(nn.Module):
                  previous_dilation=1, norm_layer=nn.BatchNorm2d):
         super(BasicBlockV1b, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
-                               padding=dilation, dilation=dilation, bias=False)
+                               padding=dilation, dilation=dilation, bias=False, padding_mode="reflect")
         self.bn1 = norm_layer(planes)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1,
-                               padding=previous_dilation, dilation=previous_dilation, bias=False)
+                               padding=previous_dilation, dilation=previous_dilation, bias=False, padding_mode="reflect")
         self.bn2 = norm_layer(planes)
 
         self.relu = nn.ReLU(inplace=True)
@@ -49,7 +49,7 @@ class BottleneckV1b(nn.Module):
         self.bn1 = norm_layer(planes)
 
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=dilation, dilation=dilation, bias=False)
+                               padding=dilation, dilation=dilation, bias=False, padding_mode="reflect")
         self.bn2 = norm_layer(planes)
 
         self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
@@ -116,16 +116,16 @@ class ResNetV1b(nn.Module):
         self.inplanes = stem_width*2 if deep_stem else 64
         super(ResNetV1b, self).__init__()
         if not deep_stem:
-            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False, padding_mode="reflect")
         else:
             self.conv1 = nn.Sequential(
-                nn.Conv2d(3, stem_width, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.Conv2d(3, stem_width, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect"),
                 norm_layer(stem_width),
                 nn.ReLU(True),
-                nn.Conv2d(stem_width, stem_width, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.Conv2d(stem_width, stem_width, kernel_size=3, stride=1, padding=1, bias=False, padding_mode="reflect"),
                 norm_layer(stem_width),
                 nn.ReLU(True),
-                nn.Conv2d(stem_width, 2*stem_width, kernel_size=3, stride=1, padding=1, bias=False)
+                nn.Conv2d(stem_width, 2*stem_width, kernel_size=3, stride=1, padding=1, bias=False, padding_mode="reflect")
             )
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(True)

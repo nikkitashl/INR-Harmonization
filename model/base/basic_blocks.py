@@ -28,7 +28,7 @@ class ConvBlock(nn.Module):
     ):
         super(ConvBlock, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, padding_mode="reflect"),
             norm_layer(out_channels) if norm_layer is not None else nn.Identity(),
             activation(),
         )
@@ -72,10 +72,10 @@ class convParams(nn.Module):
         self.output_dim = output_dim
         self.toRGB = toRGB
         self.cont_extraction_net = nn.Sequential(
-            nn.Conv2d(input_dim, hidden_dim, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.Conv2d(input_dim, hidden_dim, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect"),
             # nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, bias=False, padding_mode="reflect"),
             # nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
             nn.Conv2d(hidden_dim, output_dim, kernel_size=1, stride=1, padding=0, bias=True),

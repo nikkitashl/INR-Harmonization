@@ -108,14 +108,14 @@ class HighResolutionModule(nn.Module):
                             conv3x3s.append(nn.Sequential(
                                 nn.Conv2d(num_inchannels[j],
                                           num_outchannels_conv3x3,
-                                          kernel_size=3, stride=2, padding=1, bias=False),
+                                          kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect"),
                                 self.norm_layer(num_outchannels_conv3x3)))
                         else:
                             num_outchannels_conv3x3 = num_inchannels[j]
                             conv3x3s.append(nn.Sequential(
                                 nn.Conv2d(num_inchannels[j],
                                           num_outchannels_conv3x3,
-                                          kernel_size=3, stride=2, padding=1, bias=False),
+                                          kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect"),
                                 self.norm_layer(num_outchannels_conv3x3),
                                 nn.ReLU(inplace=relu_inplace)))
                     fuse_layer.append(nn.Sequential(*conv3x3s))
@@ -164,9 +164,9 @@ class HighResolutionNet(nn.Module):
         self.ocr_on = ocr_width > 0
         self.align_corners = align_corners
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect")
         self.bn1 = norm_layer(64)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect")
         self.bn2 = norm_layer(64)
         self.relu = nn.ReLU(inplace=relu_inplace)
 
@@ -215,7 +215,7 @@ class HighResolutionNet(nn.Module):
 
             self.conv3x3_ocr = nn.Sequential(
                 nn.Conv2d(last_inp_channels, ocr_mid_channels,
-                          kernel_size=3, stride=1, padding=1),
+                          kernel_size=3, stride=1, padding=1, padding_mode="reflect"),
                 norm_layer(ocr_mid_channels),
                 nn.ReLU(inplace=relu_inplace),
             )
@@ -244,7 +244,7 @@ class HighResolutionNet(nn.Module):
                                   kernel_size=3,
                                   stride=1,
                                   padding=1,
-                                  bias=False),
+                                  bias=False, padding_mode="reflect"),
                         self.norm_layer(num_channels_cur_layer[i]),
                         nn.ReLU(inplace=relu_inplace)))
                 else:
@@ -257,7 +257,7 @@ class HighResolutionNet(nn.Module):
                         if j == i - num_branches_pre else inchannels
                     conv3x3s.append(nn.Sequential(
                         nn.Conv2d(inchannels, outchannels,
-                                  kernel_size=3, stride=2, padding=1, bias=False),
+                                  kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect"),
                         self.norm_layer(outchannels),
                         nn.ReLU(inplace=relu_inplace)))
                 transition_layers.append(nn.Sequential(*conv3x3s))

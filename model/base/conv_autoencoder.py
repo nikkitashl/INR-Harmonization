@@ -212,8 +212,9 @@ class INRDecoder(nn.Module):
             out_channels = encoder_blocks_channels.pop() if len(encoder_blocks_channels) else in_channels // 2
             self.deconv_blocks.append(SEDeconvBlock(
                 in_channels, out_channels,
+                kernel_size=4 if d == 0 else 2,
                 norm_layer=norm_layer,
-                padding=0 if d == 0 else 1,
+                padding=0,
                 with_se=False
             ))
             in_channels = out_channels
@@ -225,7 +226,7 @@ class INRDecoder(nn.Module):
         self.lut_transform = build_lut_transform(self.appearance_mlps.output_dim, opt.LUT_dim,
                                                  None, opt)
 
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
     def forward(self, encoder_outputs, image=None, mask=None, coord_samples=None, start_proportion=None):
         """For full resolution, do split."""
@@ -287,6 +288,7 @@ class INRDecoder(nn.Module):
         output = encoder_outputs[0]
         for block, skip_output in zip(self.deconv_blocks[:-1], encoder_outputs[1:]):
             output = block(output)
+            print(output.shape, skip_output.shape)
             output = output + skip_output
         output = self.deconv_blocks[-1](output)
 
@@ -394,9 +396,9 @@ class INRDecoder(nn.Module):
                     layer[0] = layer[0].view(*layer[0].shape[:-2], -1).permute(0, 3, 1, 2).contiguous()
                     layer[1] = layer[1].view(*layer[1].shape[:-2], -1).permute(0, 3, 1, 2).contiguous()
                     layer[0] = F.grid_sample(layer[0], coorinates[..., :2].flip(-1), mode='nearest' if True
-                    else 'bilinear', padding_mode='border', align_corners=False)
+                    else 'bilinear', padding_mode='border', align_corners=True)
                     layer[1] = F.grid_sample(layer[1], coorinates[..., :2].flip(-1), mode='nearest' if True
-                    else 'bilinear', padding_mode='border', align_corners=False)
+                    else 'bilinear', padding_mode='border', align_corners=True)
                     layer[0] = layer[0].permute(0, 2, 3, 1).contiguous().view(*coorinates.shape[:-1], *weigt_shape[-2:])
                     layer[1] = layer[1].permute(0, 2, 3, 1).contiguous().view(*coorinates.shape[:-1], *bias_shape[-2:])
 

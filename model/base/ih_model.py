@@ -24,7 +24,7 @@ class IHModelWithBackbone(nn.Module):
         self.opt = opt
 
         self.mask_conv = nn.Sequential(
-            nn.Conv2d(1, backbone_conv1_channels, kernel_size=3, stride=2, padding=1, bias=True),
+            nn.Conv2d(1, backbone_conv1_channels, kernel_size=3, stride=2, padding=1, bias=True, padding_mode="reflect"),
             ScaleLayer(init_value=0.1, lr_mult=1)
         )
 

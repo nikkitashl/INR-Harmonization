@@ -27,7 +27,7 @@ import math
 global_state = [1]  # For Gradio Stop Button.
 
 class single_image_dataset(torch.utils.data.Dataset):
-    def __init__(self, opt, composite_image=None, mask=None):
+    def __init__(self, opt, composite_image=None, mask=None, accurate_mask=None):
         super().__init__()
 
         self.opt = opt
@@ -41,6 +41,11 @@ class single_image_dataset(torch.utils.data.Dataset):
             mask = cv2.imread(opt.mask)
         mask = mask[:, :, 0].astype(np.float32) / 255.
         self.mask = mask
+
+        if accurate_mask is None:
+            accurate_mask = cv2.imread(opt.accurate_mask)
+        accurate_mask = accurate_mask[:, :, 0].astype(np.float32) / 255.
+        self.accurate_mask = accurate_mask
 
         self.torch_transforms = transforms.Compose([transforms.ToTensor(),
                                                     transforms.Normalize([.5, .5, .5], [.5, .5, .5])])
@@ -95,14 +100,20 @@ class single_image_dataset(torch.utils.data.Dataset):
 
         mask = self.mask
 
+        accurate_mask = self.accurate_mask
+
         full_coord = prepare_cooridinate_input(mask).transpose(1, 2, 0)
 
         tmp_transform = albumentations.Compose([Resize(self.opt.base_size, self.opt.base_size)],
-                                               additional_targets={'object_mask': 'image'})
-        transform_out = tmp_transform(image=composite_image, object_mask=mask)
+                                               additional_targets={'object_mask': 'image', "accurate_mask": "image"})
+        transform_out = tmp_transform(image=composite_image, object_mask=mask, accurate_mask=accurate_mask)
         compos_list = [self.torch_transforms(transform_out['image'])]
         mask_list = [
             torchvision.transforms.ToTensor()(transform_out['object_mask'][..., np.newaxis].astype(np.float32))]
+
+        accurate_mask_list = [
+            torchvision.transforms.ToTensor()(transform_out['accurate_mask'][..., np.newaxis].astype(np.float32))]
+
         coord_map_list = []
 
         if composite_image.shape[0] != self.split_height_resolution:
@@ -113,30 +124,43 @@ class single_image_dataset(torch.utils.data.Dataset):
             c_w = self.split_start_point[idx][1] / (composite_image.shape[1] - self.split_width_resolution)
         else:
             c_w = 0
-        transform_out, c_h, c_w = customRandomCrop([composite_image, mask, full_coord],
+        # print(c_h, c_w)
+        # transform_out = [composite_image, mask, full_coord, accurate_mask]
+        transform_out, c_h, c_w = customRandomCrop([composite_image, mask, full_coord, accurate_mask],
                                                    self.split_height_resolution, self.split_width_resolution, c_h, c_w)
 
+        # print(f"Shapes: {composite_image.shape}, {self.split_width_resolution}x{self.split_height_resolution}, {transform_out[0].shape}")
         compos_list.append(self.torch_transforms(transform_out[0]))
         mask_list.append(
             torchvision.transforms.ToTensor()(transform_out[1][..., np.newaxis].astype(np.float32)))
         coord_map_list.append(torchvision.transforms.ToTensor()(transform_out[2]))
         coord_map_list.append(torchvision.transforms.ToTensor()(transform_out[2]))
+        accurate_mask_list.append(
+            torchvision.transforms.ToTensor()(transform_out[3][..., np.newaxis].astype(np.float32)))
         for n in range(2):
             tmp_comp = cv2.resize(composite_image, (
                 composite_image.shape[1] // 2 ** (n + 1), composite_image.shape[0] // 2 ** (n + 1)))
             tmp_mask = cv2.resize(mask, (mask.shape[1] // 2 ** (n + 1), mask.shape[0] // 2 ** (n + 1)))
             tmp_coord = prepare_cooridinate_input(tmp_mask).transpose(1, 2, 0)
 
-            transform_out, c_h, c_w = customRandomCrop([tmp_comp, tmp_mask, tmp_coord],
+            tmp_accurate_mask = cv2.resize(accurate_mask, (accurate_mask.shape[1] // 2 ** (n + 1), accurate_mask.shape[0] // 2 ** (n + 1)))
+
+            # transform_out = [tmp_comp, tmp_mask, tmp_coord, tmp_accurate_mask]
+            # print(c_h, c_w)
+            transform_out, c_h, c_w = customRandomCrop([tmp_comp, tmp_mask, tmp_coord, tmp_accurate_mask],
                                                        self.split_height_resolution // 2 ** (n + 1),
                                                        self.split_width_resolution // 2 ** (n + 1), c_h, c_w)
             compos_list.append(self.torch_transforms(transform_out[0]))
             mask_list.append(
                 torchvision.transforms.ToTensor()(transform_out[1][..., np.newaxis].astype(np.float32)))
             coord_map_list.append(torchvision.transforms.ToTensor()(transform_out[2]))
+            accurate_mask_list.append(
+                torchvision.transforms.ToTensor()(transform_out[3][..., np.newaxis].astype(np.float32)))
         out_comp = compos_list
         out_mask = mask_list
         out_coord = coord_map_list
+
+        out_acccurate_mask = accurate_mask_list
 
         fg_INR_coordinates, bg_INR_coordinates, fg_INR_RGB, fg_transfer_INR_RGB, bg_INR_RGB = self.INR_dataset.generator(
             self.torch_transforms, transform_out[0], transform_out[0], mask)
@@ -163,6 +187,12 @@ class single_image_dataset(torch.utils.data.Dataset):
             'fg_transfer_INR_RGB': fg_transfer_INR_RGB,
             'bg_INR_RGB': bg_INR_RGB,
             'start_point': self.split_start_point[idx],
+
+            "accurate_mask": out_acccurate_mask,
+            "accurate_mask0": out_acccurate_mask[0],
+            "accurate_mask1": out_acccurate_mask[1],
+            "accurate_mask2": out_acccurate_mask[2],
+            "accurate_mask3": out_acccurate_mask[3]
         }
 
 
@@ -180,6 +210,9 @@ def parse_args():
 
     parser.add_argument('--save_path', type=str, default=r'./demo/',
                         help='save path')
+
+    parser.add_argument('--save_name', type=str, default=r'./demo/',
+                        help='save name')
 
     parser.add_argument('--workers', type=int, default=8,
                         metavar='N', help='Dataloader threads.')
@@ -235,16 +268,18 @@ def parse_args():
     parser.add_argument('--isFullRes', action="store_true",
                         help='Whether for original resolution. See section 3.4 in the paper.')
 
+    parser.add_argument('--accurate_mask', type=str)
+
     opt = parser.parse_args()
 
     return opt
 
 @torch.no_grad()
-def inference(model, opt, composite_image=None, mask=None):
+def inference(model, opt, composite_image=None, mask=None, accurate_mask=None):
     model.eval()
 
     "dataset here is actually consisted of several patches of a single image."
-    singledataset = single_image_dataset(opt, composite_image, mask)
+    singledataset = single_image_dataset(opt, composite_image, mask, accurate_mask)
 
     single_data_loader = DataLoader(singledataset, opt.batch_size, shuffle=False, drop_last=False, pin_memory=True,
                                     num_workers=opt.workers, persistent_workers=False if composite_image is not None else True)
@@ -253,10 +288,10 @@ def inference(model, opt, composite_image=None, mask=None):
     init_img = np.zeros_like(singledataset.composite_image)
 
     time_all = 0
-
     for step, batch in tqdm.tqdm(enumerate(single_data_loader)):
         composite_image = [batch[f'composite_image{name}'].to(opt.device) for name in range(4)]
         mask = [batch[f'mask{name}'].to(opt.device) for name in range(4)]
+        accurate_masks = [batch[f"accurate_mask{name}"].to(opt.device) for name in range(4)]
         coordinate_map = [batch[f'coordinate_map{name}'].to(opt.device) for name in range(4)]
         start_points = batch['start_point']
 
@@ -306,8 +341,8 @@ def inference(model, opt, composite_image=None, mask=None):
         "Assemble the every patch's harmonized result into the final whole image."
         for id in range(len(fg_INR_coordinates[0])):
             pred_fg_image = fg_content_bg_appearance_construct[-1][id]
-            pred_harmonized_image = pred_fg_image * (mask[1][id] > 100 / 255.) + composite_image[1][id] * (
-                ~(mask[1][id] > 100 / 255.))
+            pred_harmonized_image = pred_fg_image * (accurate_masks[1][id] > 100 / 255.) + composite_image[1][id] * (
+                ~(accurate_masks[1][id] > 100 / 255.))
 
             pred_harmonized_tmp = cv2.cvtColor(
                 normalize(pred_harmonized_image.unsqueeze(0), opt, 'inv')[0].permute(1, 2, 0).cpu().mul_(255.).clamp_(
@@ -320,7 +355,7 @@ def inference(model, opt, composite_image=None, mask=None):
         print(f'Inference time: {time_all}')
     if opt.save_path is not None:
         os.makedirs(opt.save_path, exist_ok=True)
-        cv2.imwrite(os.path.join(opt.save_path, "pred_harmonized_image.jpg"), init_img)
+        cv2.imwrite(os.path.join(opt.save_path, opt.save_name), init_img)
     return init_img
 
 
